@@ -1,0 +1,49 @@
+# Overlay: use the images published by GitHub Actions (ghcr.io) instead of building
+# on the server, with memory settings that fit a 1 GB instance (t3.micro).
+# Used by: IMAGES=ghcr ./deploy/ec2/deploy.sh
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../k8s
+images:
+  - name: eventhub-backend
+    newName: ghcr.io/likhithuc/eventhub-backend
+    newTag: main
+  - name: eventhub-frontend
+    newName: ghcr.io/likhithuc/eventhub-frontend
+    newTag: main
+patches:
+  - target: { kind: Deployment, name: backend }
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Always
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests: { cpu: 50m, memory: 320Mi }
+          limits: { memory: 560Mi }
+      - op: replace
+        path: /spec/template/spec/containers/0/startupProbe/failureThreshold
+        value: 60
+      - op: add
+        path: /spec/template/spec/containers/0/env
+        value:
+          # Lean JVM settings for a small machine: smaller heap share, serial GC, capped metaspace/code cache.
+          - name: JAVA_TOOL_OPTIONS
+            value: "-XX:MaxRAMPercentage=60 -XX:+UseSerialGC -XX:MaxMetaspaceSize=160m -XX:ReservedCodeCacheSize=48m -Xss512k -XX:+ExitOnOutOfMemoryError"
+  - target: { kind: Deployment, name: frontend }
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Always
+  - target: { kind: StatefulSet, name: postgres }
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests: { cpu: 25m, memory: 64Mi }
+          limits: { memory: 256Mi }
+      - op: add
+        path: /spec/template/spec/containers/0/args
+        value: ["-c", "shared_buffers=32MB", "-c", "max_connections=30", "-c", "work_mem=2MB"]

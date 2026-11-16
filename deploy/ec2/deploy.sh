@@ -7,8 +7,10 @@
 # Options (environment variables):
 #     LE_EMAIL=you@example.com   enable HTTPS with a free Let's Encrypt certificate
 #     DOMAIN=events.example.com  your own domain (default with HTTPS: <public-ip>.sslip.io)
+#     IMAGES=ghcr                use the images GitHub Actions publishes to ghcr.io instead of
+#                                building on this machine (needed on 1 GB instances like t3.micro)
 #     SEED_DEMO_EVENTS=false     don't create the demo organizer's sample events (default: true)
-#     FORCE=1                    deploy even on an instance with less than 1.8 GB of RAM
+#     FORCE=1                    deploy even on an instance with less RAM than recommended
 set -euo pipefail
 
 K3S_VERSION="v1.31.4+k3s1"
@@ -17,6 +19,12 @@ NS=eventhub
 REPO_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 CREDS_FILE="$HOME/eventhub-credentials.txt"
 SEED_DEMO_EVENTS="${SEED_DEMO_EVENTS:-true}"
+IMAGES="${IMAGES:-build}"
+case "$IMAGES" in
+  build) MANIFESTS="$REPO_DIR/deploy/k8s"; MIN_MEM_MB=1800 ;;
+  ghcr)  MANIFESTS="$REPO_DIR/deploy/k8s-ghcr"; MIN_MEM_MB=850 ;;
+  *) echo "IMAGES must be 'build' or 'ghcr'" >&2; exit 1 ;;
+esac
 
 log()  { printf '\n\033[1;35m==> %s\033[0m\n' "$*"; }
 warn() { printf '\033[1;33mWARNING: %s\033[0m\n' "$*"; }
@@ -27,8 +35,14 @@ kc()   { sudo k3s kubectl "$@"; }
 log "Checking the machine"
 mem_mb=$(awk '/MemTotal/ {print int($2/1024)}' /proc/meminfo)
 echo "RAM: ${mem_mb} MB, CPUs: $(nproc), free disk on /: $(df -h / | awk 'NR==2 {print $4}')"
-if [ "$mem_mb" -lt 1800 ] && [ "${FORCE:-0}" != 1 ]; then
-  die "This needs at least 2 GB of RAM (e.g. t3.small). Use a bigger instance, or re-run with FORCE=1 to try anyway."
+if [ "$mem_mb" -lt "$MIN_MEM_MB" ] && [ "${FORCE:-0}" != 1 ]; then
+  if [ "$IMAGES" = build ]; then
+    die "Building images here needs at least 2 GB of RAM (e.g. t3.small). On a smaller instance use the prebuilt images: IMAGES=ghcr ./deploy/ec2/deploy.sh"
+  fi
+  die "This needs at least 1 GB of RAM. Re-run with FORCE=1 to try anyway."
+fi
+if [ "$IMAGES" = ghcr ] && [ "$mem_mb" -lt 1800 ]; then
+  warn "Small instance (${mem_mb} MB): it will work for a demo, but expect slow start-up and little headroom."
 fi
 
 if ! swapon --show | grep -q .; then
@@ -41,11 +55,13 @@ if ! swapon --show | grep -q .; then
 fi
 
 # ------------------------------------------------------------------ 2. tools
-if ! command -v docker >/dev/null 2>&1; then
-  log "Installing Docker and git"
-  sudo dnf install -y docker git
+if [ "$IMAGES" = build ]; then
+  if ! command -v docker >/dev/null 2>&1; then
+    log "Installing Docker and git"
+    sudo dnf install -y docker git
+  fi
+  sudo systemctl enable --now docker >/dev/null
 fi
-sudo systemctl enable --now docker >/dev/null
 
 if ! command -v k3s >/dev/null 2>&1; then
   log "Installing k3s ${K3S_VERSION}"
@@ -73,13 +89,17 @@ fi
 echo "Public URL will be: $PUBLIC_URL"
 
 # ------------------------------------------------------------------ 4. images
-log "Building container images (the backend build takes a few minutes the first time)"
-sudo docker build -t eventhub-backend:local "$REPO_DIR/backend"
-sudo docker build -t eventhub-frontend:local "$REPO_DIR/frontend"
-log "Loading images into k3s"
-sudo docker save eventhub-backend:local | sudo k3s ctr -n k8s.io images import -
-sudo docker save eventhub-frontend:local | sudo k3s ctr -n k8s.io images import -
-sudo docker image prune -f >/dev/null
+if [ "$IMAGES" = build ]; then
+  log "Building container images (the backend build takes a few minutes the first time)"
+  sudo docker build -t eventhub-backend:local "$REPO_DIR/backend"
+  sudo docker build -t eventhub-frontend:local "$REPO_DIR/frontend"
+  log "Loading images into k3s"
+  sudo docker save eventhub-backend:local | sudo k3s ctr -n k8s.io images import -
+  sudo docker save eventhub-frontend:local | sudo k3s ctr -n k8s.io images import -
+  sudo docker image prune -f >/dev/null
+else
+  log "Using prebuilt images from ghcr.io (built by GitHub Actions); Kubernetes will pull them"
+fi
 
 # ------------------------------------------------------------------ 5. secrets and config
 kc get namespace "$NS" >/dev/null 2>&1 || kc create namespace "$NS"
@@ -123,7 +143,7 @@ kc -n "$NS" create configmap eventhub-config \
 
 # ------------------------------------------------------------------ 6. workloads
 log "Applying Kubernetes manifests"
-kc apply -k "$REPO_DIR/deploy/k8s"
+kc apply -k "$MANIFESTS"
 
 if [ -n "${LE_EMAIL:-}" ]; then
   log "Enabling HTTPS for $DOMAIN (Let's Encrypt via cert-manager ${CERT_MANAGER_VERSION})"
