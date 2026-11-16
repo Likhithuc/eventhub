@@ -33,7 +33,7 @@ Files: `deploy/k8s/*.yaml` (manifests), `deploy/ec2/deploy.sh` (install + deploy
 
 | | Minimum | Notes |
 |---|---|---|
-| Type | **t3.small** (2 vCPU, 2 GB) | t3.micro (1 GB) is too small for Kubernetes + Java. The script refuses below ~1.8 GB unless `FORCE=1`. |
+| Type | **t3.micro** (1 GB) with prebuilt images · **t3.small** (2 GB) to build on the server | On 1 GB, use `IMAGES=ghcr` (images built by GitHub Actions, see below). Building on the server needs ~2 GB. |
 | OS | Amazon Linux 2023 | (the `ec2-user` login) |
 | Disk | 20 GB gp3 | images + database + backups |
 | Network | public IPv4 address | |
@@ -61,6 +61,27 @@ cd eventhub
 (For a private repository, use a GitHub fine-grained personal access token with read-only "Contents" access as the password when git asks.)
 
 ## 3. Deploy
+
+### Prebuilt images (any size, required on 1 GB / t3.micro)
+
+Every push to `main` runs **GitHub Actions** (`.github/workflows/ci.yml`): backend tests, frontend lint/build, and then it publishes both images to GitHub Container Registry:
+
+- `ghcr.io/likhithuc/eventhub-backend:main`
+- `ghcr.io/likhithuc/eventhub-frontend:main`
+
+The instance only downloads them, so no Docker or Java build is needed on the server. Add `IMAGES=ghcr` to any deploy command below:
+
+```bash
+IMAGES=ghcr LE_EMAIL=you@example.com ./deploy/ec2/deploy.sh
+```
+
+This uses the `deploy/k8s-ghcr` overlay with lean memory settings (backend ~300 MiB within a 560 MiB limit). It fits a 1 GB instance for a demo, but start-up is slower and there is little headroom; t3.small is better for real traffic.
+
+> Because this repository is public, the images are public too, so the server can download them without logging in. If you ever make the repository private, either make the packages public (GitHub → profile → **Packages** → package → **Package settings → Change visibility**) or the pods will fail with `ErrImagePull`.
+
+To update: push to `main`, wait for the CI run to finish (green check on GitHub), then on the server run `cd ~/eventhub && git pull && IMAGES=ghcr LE_EMAIL=… ./deploy/ec2/deploy.sh`.
+
+### Building on the server (2 GB+ instances)
 
 **HTTPS (recommended).** Get a free Let's Encrypt certificate. Without your own domain, the site gets an address like `https://13-51-10-20.sslip.io`, which maps to your instance's IP:
 
