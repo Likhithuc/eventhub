@@ -1,0 +1,87 @@
+/* ---------- Booking panel (event details) ---------- */
+.ticket-row.is-disabled strong { color: var(--text-muted); }
+.ticket-row-end { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.text-danger { color: var(--danger); font-weight: 600; }
+.text-warning { color: var(--warning); font-weight: 600; }
+.stepper { display: inline-flex; align-items: center; border: 1px solid var(--border-strong); border-radius: 10px; overflow: hidden; }
+.stepper button {
+  width: 32px; height: 32px; display: grid; place-items: center; border: 0; background: var(--surface); color: var(--text-h); cursor: pointer;
+}
+.stepper button:hover:not(:disabled) { background: var(--primary-soft); color: var(--primary); }
+.stepper button:disabled { color: var(--text-muted); opacity: 0.45; cursor: not-allowed; }
+.stepper output { min-width: 30px; text-align: center; font-weight: 700; color: var(--text-h); font-variant-numeric: tabular-nums; }
+.booking-total { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.9rem; color: var(--text); }
+.booking-total strong { font-family: var(--font-display); font-size: 1.15rem; color: var(--success); }
+.policy { display: flex; gap: 6px; align-items: flex-start; font-size: 0.8rem; color: var(--text-muted); }
+.policy svg { flex: none; margin-top: 2px; }
+
+/* ---------- Booking confirmation ---------- */
+.booked-banner {
+  display: flex; gap: 16px; align-items: center; margin: 18px 0; padding: 18px 20px; border-radius: var(--radius-lg);
+  background: var(--success-soft); border: 1px solid color-mix(in srgb, var(--success) 25%, transparent);
+  animation: pop 0.3s ease-out;
+}
+.booked-banner h1 { font-size: 1.4rem; color: var(--success); }
+.booked-banner p { color: var(--text-h); margin-top: 2px; }
+.booked-icon { width: 52px; height: 52px; border-radius: 16px; display: grid; place-items: center; flex: none; background: var(--success); color: #fff; }
+
+.ticket-card { border-radius: var(--radius-xl); overflow: hidden; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-lg); }
+.ticket-card.is-inactive .ticket-card-top { filter: grayscale(0.85); }
+.ticket-card-top { position: relative; overflow: hidden; isolation: isolate; padding: 22px 24px 26px; color: #fff; }
+.ticket-card-top h2 { color: #fff; font-size: clamp(1.4rem, 3vw, 1.9rem); margin-top: 12px; overflow-wrap: anywhere; }
+.ticket-card-icon { position: absolute; right: -14px; bottom: -30px; color: rgba(255, 255, 255, 0.16); transform: rotate(-12deg); z-index: -1; }
+.ticket-card-meta { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; font-size: 0.9rem; color: rgba(255, 255, 255, 0.92); }
+.ticket-card-meta span { display: flex; gap: 8px; align-items: flex-start; }
+.ticket-card-meta svg { flex: none; margin-top: 3px; }
+.badge-on-dark { background: rgba(255, 255, 255, 0.22); color: #fff; border-color: rgba(255, 255, 255, 0.35); }
+/* Perforated tear line between the stub and the body */
+.ticket-card-perf {
+  height: 0; border-top: 2px dashed var(--border-strong); margin: 0 18px; position: relative;
+}
+.ticket-card-perf::before, .ticket-card-perf::after {
+  content: ''; position: absolute; top: -12px; width: 22px; height: 22px; border-radius: 50%; background: var(--bg);
+  border: 1px solid var(--border);
+}
+.ticket-card-perf::before { left: -30px; }
+.ticket-card-perf::after { right: -30px; }
+.ticket-card-body { padding: 22px 24px 24px; display: flex; flex-direction: column; gap: 18px; }
+.ticket-ref { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.ref-code { display: block; font-family: var(--font-mono); font-size: clamp(1.4rem, 4vw, 1.9rem); letter-spacing: 0.08em; color: var(--text-h); margin-top: 2px; }
+.qr-placeholder {
+  display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: var(--radius); background: var(--surface-2);
+  border: 1px dashed var(--border-strong); color: var(--text-muted); font-size: 0.85rem;
+}
+.qr-placeholder svg { flex: none; color: var(--primary); }
+.receipt { width: 100%; border-collapse: collapse; font-size: 0.925rem; }
+.receipt td { padding: 9px 0; border-bottom: 1px solid var(--border); color: var(--text-h); }
+.receipt td:last-child { text-align: right; font-weight: 600; }
+.receipt-total td { border-bottom: 0; font-weight: 700; padding-top: 12px; }
+.policy-line { display: flex; align-items: center; gap: 6px; }
+
+/* ---------- My bookings ---------- */
+.tabs-plain { padding: 0; margin-bottom: 18px; background: transparent; }
+.booking-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.booking-row { display: flex; align-items: center; gap: 16px; padding: 14px; color: inherit; transition: border-color 0.15s, box-shadow 0.15s; }
+.booking-row:hover { color: inherit; border-color: var(--primary-soft-border); box-shadow: var(--shadow); }
+.booking-date {
+  width: 64px; height: 64px; border-radius: 14px; flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: #fff; line-height: 1;
+}
+.booking-date span { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; opacity: 0.9; }
+.booking-date strong { font-family: var(--font-display); font-size: 1.5rem; font-weight: 800; margin-top: 3px; }
+.booking-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.booking-main strong { color: var(--text-h); font-size: 1.02rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.booking-main span { display: flex; align-items: center; gap: 6px; font-size: 0.84rem; color: var(--text-muted); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.booking-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex: none; }
+
+/* ---------- Organizer sales ---------- */
+.sales-row-head { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 6px; font-size: 0.9rem; }
+.sales-row-head strong { color: var(--text-h); }
+.meter { height: 8px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
+.meter span { display: block; height: 100%; border-radius: 999px; background: var(--gradient-brand); transition: width 0.4s ease; }
+
+@media (max-width: 560px) {
+  .booking-row { flex-wrap: wrap; }
+  .booking-side { flex-direction: row; align-items: center; width: 100%; justify-content: space-between; }
+  .ticket-ref { flex-wrap: wrap; }
+}

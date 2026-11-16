@@ -1,0 +1,72 @@
+# PostgreSQL for a single-node cluster. Data lives on a PersistentVolume (k3s local-path),
+# so it survives pod restarts and redeploys. For a managed database, use AWS RDS instead:
+# set DB_URL to the RDS endpoint and remove this file from kustomization.yaml.
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: eventhub
+  labels: { app: postgres }
+spec:
+  selector: { app: postgres }
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: eventhub
+  labels: { app: postgres, app.kubernetes.io/part-of: eventhub }
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels: { app: postgres }
+  template:
+    metadata:
+      labels: { app: postgres }
+    spec:
+      securityContext:
+        fsGroup: 70 # postgres user in the alpine image
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: eventhub
+            - name: POSTGRES_USER
+              value: eventhub
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: eventhub-secrets, key: DB_PASSWORD }
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "eventhub", "-d", "eventhub"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "eventhub", "-d", "eventhub"]
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 384Mi }
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi

@@ -1,0 +1,49 @@
+# React app served by unprivileged nginx.
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: eventhub
+  labels: { app: frontend }
+spec:
+  selector: { app: frontend }
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: eventhub
+  labels: { app: frontend, app.kubernetes.io/part-of: eventhub }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: frontend }
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  template:
+    metadata:
+      labels: { app: frontend }
+    spec:
+      containers:
+        - name: frontend
+          image: eventhub-frontend:local
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 20m, memory: 32Mi }
+            limits: { memory: 64Mi }

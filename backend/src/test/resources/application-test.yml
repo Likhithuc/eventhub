@@ -1,0 +1,19 @@
+# Activated with @ActiveProfiles("test"). These explicit values win over anything in the developer's .env.
+app:
+  timezone: Asia/Kolkata
+  mail:
+    # Tests use RecordingMailSender (see TestcontainersConfiguration) instead of SMTP.
+    enabled: true
+    from: "EventHub Test <no-reply@test.local>"
+    frontend-url: http://frontend.test
+  auth:
+    # Test-only key (Base64 of 32 bytes). Not used anywhere else.
+    jwt-secret: dGVzdC1vbmx5LWp3dC1zZWNyZXQtMzItYnl0ZXMtbG9uZyE=
+    issuer: eventhub-test
+    access-token-ttl: 15m
+    refresh-token-ttl: 1d
+    refresh-cookie-secure: false
+    refresh-cookie-same-site: Strict
+  seed:
+    enabled: false
+    demo-events: false

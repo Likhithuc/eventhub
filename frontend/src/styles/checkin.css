@@ -1,0 +1,67 @@
+/* ---------- Entry passes (attendee) ---------- */
+.passes-title { display: flex; align-items: center; gap: 8px; font-size: 1rem; }
+.passes { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; margin-top: 14px; }
+.pass {
+  border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px; background: var(--surface);
+  display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center;
+}
+.pass-head { display: flex; justify-content: space-between; width: 100%; font-size: 0.8rem; font-weight: 600; color: var(--text-h); }
+.pass-qr {
+  position: relative; width: 196px; height: 196px; padding: 8px; border-radius: 14px; background: #fff;
+  box-shadow: inset 0 0 0 1px #e7e5f0;
+}
+.pass-qr img { width: 180px; height: 180px; display: block; image-rendering: pixelated; }
+.pass-qr-loading { width: 180px; height: 180px; }
+.pass-overlay {
+  position: absolute; inset: 0; border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  background: rgba(255, 255, 255, 0.9); color: #6f6b86; font-weight: 700;
+}
+.pass-overlay-used { background: rgba(236, 253, 245, 0.92); color: #059669; }
+.pass-code { font-family: var(--font-mono); font-size: 1.15rem; letter-spacing: 0.12em; font-weight: 700; color: var(--text-h); }
+.pass.is-used .pass-code, .pass.is-void .pass-code { text-decoration: line-through; color: var(--text-muted); }
+
+/* ---------- Door check-in (organizer) ---------- */
+.checkin-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: start; }
+.checkin-form { display: flex; flex-direction: column; gap: 10px; }
+.checkin-input-row { display: flex; gap: 10px; }
+.checkin-input {
+  height: 56px; font-family: var(--font-mono); font-size: 1.35rem; letter-spacing: 0.1em; text-transform: uppercase;
+}
+.checkin-input::placeholder { letter-spacing: 0.04em; text-transform: none; font-family: var(--font-sans); font-size: 1rem; }
+.checkin-input-row .btn { height: 56px; }
+
+.checkin-result {
+  display: flex; gap: 18px; align-items: flex-start; padding: 22px 24px; border-radius: var(--radius-lg); border: 2px solid;
+  animation: pop 0.18s ease-out;
+}
+.checkin-result svg { flex: none; }
+.checkin-result.tone-ok { background: var(--success-soft); border-color: var(--success); color: var(--success); }
+.checkin-result.tone-warn { background: var(--warning-soft); border-color: var(--warning); color: var(--warning); }
+.checkin-result.tone-bad { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); }
+.checkin-result-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; color: var(--text-h); }
+.checkin-result-body strong { font-family: var(--font-display); font-size: 1.5rem; }
+.tone-ok .checkin-result-body strong { color: var(--success); }
+.tone-warn .checkin-result-body strong { color: var(--warning); }
+.tone-bad .checkin-result-body strong { color: var(--danger); }
+.checkin-name { font-size: 1.15rem; font-weight: 600; overflow-wrap: anywhere; }
+.checkin-when { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.mono-plain { font-family: var(--font-mono); }
+
+.checkin-count { display: flex; align-items: baseline; gap: 6px; margin: 6px 0 12px; }
+.checkin-count strong { font-family: var(--font-display); font-size: 2.6rem; font-weight: 800; color: var(--text-h); line-height: 1; }
+.checkin-count span { color: var(--text-muted); font-size: 1.1rem; }
+.recent-list { list-style: none; margin: 0; padding: 0; }
+.recent-list li { display: flex; align-items: center; gap: 10px; padding: 11px 20px; border-top: 1px solid var(--border); }
+.recent-list li:first-child { border-top: 0; }
+.recent-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.recent-main strong { color: var(--text-h); font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recent-main span { font-size: 0.78rem; color: var(--text-muted); }
+.text-success { color: var(--success); }
+
+@media (max-width: 900px) {
+  .checkin-layout { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .checkin-input-row { flex-direction: column; }
+  .checkin-result { padding: 18px; gap: 12px; }
+}

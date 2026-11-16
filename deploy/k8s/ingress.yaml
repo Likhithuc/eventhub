@@ -1,0 +1,28 @@
+# One public address for the whole app (k3s ships Traefik as the ingress controller):
+#   /api/*  -> backend pod
+#   /*      -> frontend pod
+# Same origin for both, so the browser needs no CORS and the refresh cookie just works.
+# Actuator endpoints are deliberately NOT routed: they stay internal to the cluster.
+# deploy.sh adds a host + TLS section when HTTPS is enabled.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: eventhub
+  namespace: eventhub
+spec:
+  ingressClassName: traefik
+  rules:
+    - http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port: { number: 8080 }
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port: { number: 8080 }

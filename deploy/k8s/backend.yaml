@@ -1,0 +1,61 @@
+# Spring Boot API. Configuration comes from the eventhub-config ConfigMap and the
+# eventhub-secrets Secret, both created by deploy/ec2/deploy.sh (never committed).
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: eventhub
+  labels: { app: backend }
+spec:
+  selector: { app: backend }
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: eventhub
+  labels: { app: backend, app.kubernetes.io/part-of: eventhub }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: backend }
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  template:
+    metadata:
+      labels: { app: backend }
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: backend
+          # Built on the node and imported into k3s by deploy.sh (no registry needed).
+          image: eventhub-backend:local
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef: { name: eventhub-config }
+            - secretRef: { name: eventhub-secrets }
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+          # Flyway migrations run on start-up; allow up to ~3 minutes on a small instance.
+          startupProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8080 }
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8080 }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8080 }
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            requests: { cpu: 100m, memory: 512Mi }
+            limits: { memory: 768Mi }

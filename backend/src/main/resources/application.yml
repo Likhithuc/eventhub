@@ -1,0 +1,85 @@
+spring:
+  application:
+    name: eventhub
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+  config:
+    # Optional: load values from the repo-root .env when running from backend/.
+    import: optional:file:../.env[.properties]
+  autoconfigure:
+    # No in-memory default user; real authentication arrives in Phase 2.
+    exclude: org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/eventhub}
+    username: ${DB_USERNAME:eventhub}
+    password: ${DB_PASSWORD:eventhub}
+  jpa:
+    open-in-view: false
+    hibernate:
+      # Schema is owned by Flyway; Hibernate only validates.
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  mail:
+    # Local dev: Mailpit from docker-compose (web inbox at http://localhost:8025).
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: ${SERVER_PORT:8080}
+  # Finish in-flight requests when Kubernetes stops the pod.
+  shutdown: graceful
+  # Behind an ingress/load balancer: trust X-Forwarded-* so the app knows the original scheme and host.
+  forward-headers-strategy: ${FORWARD_HEADERS_STRATEGY:framework}
+
+app:
+  # Platform timezone: used to interpret date filters such as ?from=2026-12-01.
+  timezone: ${APP_TIMEZONE:Asia/Kolkata}
+  mail:
+    # Booking confirmation emails. Sent after commit, in the background; failures are logged only.
+    enabled: ${MAIL_ENABLED:true}
+    from: "${MAIL_FROM:EventHub <no-reply@eventhub.local>}"
+    frontend-url: ${FRONTEND_URL:http://localhost:5173}
+  cors:
+    # Comma-separated list of allowed frontend origins.
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  auth:
+    # Required. Base64, >= 32 bytes. Generate: openssl rand -base64 32
+    jwt-secret: ${JWT_SECRET:}
+    issuer: ${JWT_ISSUER:eventhub}
+    access-token-ttl: ${ACCESS_TOKEN_TTL:15m}
+    refresh-token-ttl: ${REFRESH_TOKEN_TTL:14d}
+    # Secure cookies need HTTPS; true by default, set false only for http://localhost.
+    refresh-cookie-secure: ${REFRESH_COOKIE_SECURE:true}
+    refresh-cookie-same-site: ${REFRESH_COOKIE_SAME_SITE:Strict}
+  seed:
+    # Development-only seeding (accounts + demo events). Keep false outside local dev.
+    enabled: ${APP_SEED_ENABLED:false}
+    demo-events: ${APP_SEED_DEMO_EVENTS:true}
+    admin:
+      email: ${DEV_ADMIN_EMAIL:}
+      password: ${DEV_ADMIN_PASSWORD:}
+    organizer:
+      email: ${DEV_ORGANIZER_EMAIL:}
+      password: ${DEV_ORGANIZER_PASSWORD:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
