@@ -102,7 +102,7 @@ else
 fi
 
 # ------------------------------------------------------------------ 5. secrets and config
-kc get namespace "$NS" >/dev/null 2>&1 || kc create namespace "$NS"
+kc create namespace "$NS" --dry-run=client -o yaml | kc apply -f - >/dev/null
 
 if ! kc -n "$NS" get secret eventhub-secrets >/dev/null 2>&1; then
   log "Generating secrets (first deploy only; kept on later deploys)"
@@ -148,8 +148,11 @@ kc apply -k "$MANIFESTS"
 if [ -n "${LE_EMAIL:-}" ]; then
   log "Enabling HTTPS for $DOMAIN (Let's Encrypt via cert-manager ${CERT_MANAGER_VERSION})"
   kc apply -f "https://github.com/cert-manager/cert-manager/releases/download/${CERT_MANAGER_VERSION}/cert-manager.yaml" >/dev/null
-  kc -n cert-manager rollout status deploy/cert-manager-webhook --timeout=180s
-  cat <<EOF | kc apply -f -
+  for d in cert-manager cert-manager-cainjector cert-manager-webhook; do
+    kc -n cert-manager rollout status "deploy/$d" --timeout=300s
+  done
+  ISSUER_FILE=$(mktemp)
+  cat > "$ISSUER_FILE" <<EOF
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
@@ -175,6 +178,15 @@ spec:
     scheme: https
     permanent: true
 EOF
+  # The cert-manager webhook reports "rolled out" a little before it accepts requests,
+  # so retry for up to ~3 minutes instead of failing on the first attempt.
+  for attempt in $(seq 1 36); do
+    if kc apply -f "$ISSUER_FILE" 2>/dev/null; then break; fi
+    [ "$attempt" = 36 ] && { kc apply -f "$ISSUER_FILE"; die "cert-manager is not accepting requests; re-run the script in a minute."; }
+    echo "cert-manager is still starting; retrying in 5 s (attempt $attempt/36)..."
+    sleep 5
+  done
+  rm -f "$ISSUER_FILE"
   kc -n "$NS" annotate ingress eventhub --overwrite \
     cert-manager.io/cluster-issuer=letsencrypt \
     traefik.ingress.kubernetes.io/router.middlewares="${NS}-redirect-https@kubernetescrd"
