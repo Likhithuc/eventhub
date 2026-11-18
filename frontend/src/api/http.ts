@@ -133,5 +133,10 @@ export async function http<T>(path: string, opts: RequestOptions = {}): Promise<
     const detail = (body as ProblemDetail | null)?.detail
     throw new ApiError(res.status, detail ?? `Request failed: ${res.status}`, body)
   }
+  // A 2xx that isn't JSON (e.g. an HTML page from a proxy) is not a valid API answer.
+  if (body !== null && !(res.headers.get('Content-Type') ?? '').includes('json')) {
+    const detail = 'The server is starting up. Please try again in a moment.'
+    throw new ApiError(503, detail, { status: 503, detail })
+  }
   return body as T
 }
