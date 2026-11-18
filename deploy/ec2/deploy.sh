@@ -30,6 +30,18 @@ log()  { printf '\n\033[1;35m==> %s\033[0m\n' "$*"; }
 warn() { printf '\033[1;33mWARNING: %s\033[0m\n' "$*"; }
 die()  { printf '\033[1;31mERROR: %s\033[0m\n' "$*" >&2; exit 1; }
 kc()   { sudo k3s kubectl "$@"; }
+# Manifests are validated in CI, so skip kubectl's client-side validation: it downloads the
+# whole OpenAPI schema, which can time out on small, busy instances.
+ka()   { kc apply --validate=false "$@"; }
+# Wait until the Kubernetes API answers (it can be slow while pods start on small instances).
+wait_api() {
+  for _ in $(seq 1 60); do
+    kc get --raw=/readyz >/dev/null 2>&1 && return 0
+    echo "Kubernetes API is busy; waiting..."
+    sleep 5
+  done
+  die "The Kubernetes API did not respond for 5 minutes. The instance is probably overloaded (check: uptime; free -h)."
+}
 
 # ------------------------------------------------------------------ 1. machine checks
 log "Checking the machine"
@@ -102,7 +114,8 @@ else
 fi
 
 # ------------------------------------------------------------------ 5. secrets and config
-kc create namespace "$NS" --dry-run=client -o yaml | kc apply -f - >/dev/null
+wait_api
+kc create namespace "$NS" --dry-run=client -o yaml | ka -f - >/dev/null
 
 if ! kc -n "$NS" get secret eventhub-secrets >/dev/null 2>&1; then
   log "Generating secrets (first deploy only; kept on later deploys)"
@@ -139,15 +152,22 @@ kc -n "$NS" create configmap eventhub-config \
   --from-literal=APP_SEED_DEMO_EVENTS="$SEED_DEMO_EVENTS" \
   --from-literal=DEV_ADMIN_EMAIL="admin@eventhub.local" \
   --from-literal=DEV_ORGANIZER_EMAIL="organizer@eventhub.local" \
-  --dry-run=client -o yaml | kc apply -f -
+  --dry-run=client -o yaml | ka -f -
 
 # ------------------------------------------------------------------ 6. workloads
 log "Applying Kubernetes manifests"
-kc apply -k "$MANIFESTS"
+for attempt in 1 2 3 4 5; do
+  wait_api
+  if ka -k "$MANIFESTS"; then break; fi
+  [ "$attempt" = 5 ] && die "Could not apply the manifests. Re-run the script; if it keeps failing the instance is overloaded."
+  echo "Apply failed; retrying in 10 s (attempt $attempt/5)..."
+  sleep 10
+done
 
 if [ -n "${LE_EMAIL:-}" ]; then
   log "Enabling HTTPS for $DOMAIN (Let's Encrypt via cert-manager ${CERT_MANAGER_VERSION})"
-  kc apply -f "https://github.com/cert-manager/cert-manager/releases/download/${CERT_MANAGER_VERSION}/cert-manager.yaml" >/dev/null
+  wait_api
+  ka -f "https://github.com/cert-manager/cert-manager/releases/download/${CERT_MANAGER_VERSION}/cert-manager.yaml" >/dev/null
   for d in cert-manager cert-manager-cainjector cert-manager-webhook; do
     kc -n cert-manager rollout status "deploy/$d" --timeout=300s
   done
@@ -181,8 +201,8 @@ EOF
   # The cert-manager webhook reports "rolled out" a little before it accepts requests,
   # so retry for up to ~3 minutes instead of failing on the first attempt.
   for attempt in $(seq 1 36); do
-    if kc apply -f "$ISSUER_FILE" 2>/dev/null; then break; fi
-    [ "$attempt" = 36 ] && { kc apply -f "$ISSUER_FILE"; die "cert-manager is not accepting requests; re-run the script in a minute."; }
+    if ka -f "$ISSUER_FILE" 2>/dev/null; then break; fi
+    [ "$attempt" = 36 ] && { ka -f "$ISSUER_FILE"; die "cert-manager is not accepting requests; re-run the script in a minute."; }
     echo "cert-manager is still starting; retrying in 5 s (attempt $attempt/36)..."
     sleep 5
   done
